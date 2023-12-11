@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>D3绘制北京地铁线路图</title>
+  </head>
+  <body>
+    <svg width="1200" height="760"></svg>
+
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="./data.js"></script>
+    <script>
+      // 地铁数据
+      const lines = res.data; // 线路数据
+
+      const max = res.max; // 地铁坐标信息最大值
+
+      const RANGE_MAX = 1000; // 值域
+      const RANGE_MIN = 0; // 值域
+      // 线性比例尺
+      const scaleLinear = d3
+        .scaleLinear()
+        .domain([0, max])
+        .range([RANGE_MIN, RANGE_MAX]);
+
+      // 常量
+      const FONT_SIZE = scaleLinear(12); // 字体大小
+      const TEXT_HEIGHT = scaleLinear(20); // 字体高度
+      const CIRCLE_RADIUS = scaleLinear(3); // 普通站点半径
+      const CHANGE_CIRCLE_RADIUS = scaleLinear(6); // 换乘站点半径
+      const CIRCLE_STROKE_WIDTH = scaleLinear(1); // 站点轮廓宽度
+      const PATH_STROKE_WIDTH = scaleLinear(4); // 路径宽度
+
+      // 地铁站点
+      const s = [];
+
+      lines.forEach(function (line) {
+        s.push(...line.st);
+      });
+      // 换乘
+      const map = new Map();
+      const changeArr = [];
+      s.map((item) => {
+        if (map.get(item.poiid)) {
+          map.set(item.poiid, map.get(item.poiid) + 1);
+          if (!changeArr.includes(item.poiid)) {
+            changeArr.push(item.poiid);
+          }
+        } else {
+          map.set(item.poiid, 1);
+        }
+      });
+
+      // 绘制地铁线路
+      const rootElement = d3.select("svg");
+
+      // 路径
+      rootElement
+        .selectAll("path")
+        .data(lines)
+        .enter()
+        .append("path")
+        .attr("d", (d) => {
+          const path = d3.path();
+          d.c.forEach(([x, y], index) => {
+            if (index === 0) {
+              path.moveTo(scaleLinear(x), scaleLinear(y));
+            } else {
+              path.lineTo(scaleLinear(x), scaleLinear(y));
+            }
+          });
+          return path;
+        })
+        .attr("stroke", (d) => "#" + d.cl)
+        .attr("fill", "transparent")
+        .attr("stroke-width", PATH_STROKE_WIDTH);
+
+      // 站点
+      rootElement
+        .selectAll("circle")
+        .data(s)
+        .enter()
+        .append("circle")
+        .attr("r", (d) =>
+          changeArr.includes(d.poiid) ? CHANGE_CIRCLE_RADIUS : CIRCLE_RADIUS
+        )
+        .style("stroke", (d) =>
+          changeArr.includes(d.poiid) ? "orange" : "#000"
+        )
+        .style("stroke-width", CIRCLE_STROKE_WIDTH)
+        .style("fill", (d) => (changeArr.includes(d.poiid) ? "orange" : "#fff"))
+        .attr("cx", (d) => scaleLinear(d.p[0]))
+        .attr("cy", (d) => scaleLinear(d.p[1]))
+        .attr("name", (d) => d.n);
+
+      // 站点名称
+      rootElement
+        .selectAll(".st_name")
+        .data(s)
+        .enter()
+        .append("text")
+        .attr("class", "st_name")
+        .attr("font-size", `${FONT_SIZE}px`)
+        .attr("fill", "#000")
+        .attr("x", (d) => scaleLinear(d.p[0]))
+        .attr("y", (d) => scaleLinear(d.p[1]))
+        .text((d) => d.n);
+
+      // 线路
+      rootElement
+        .selectAll("rect")
+        .data(lines)
+        .enter()
+        .append("rect")
+        .attr("id", (d) => d.ls)
+        .attr("width", (d) => {
+          const textWidth = scaleLinear(d.kn.length * 14);
+          return textWidth;
+        })
+        .attr("height", TEXT_HEIGHT)
+        .attr("x", (d) => scaleLinear(+d.lp[0]))
+        .attr("y", (d) => scaleLinear(+d.lp[1]))
+        .attr("fill", (d) => "#" + d.cl);
+
+      // 线路名称
+      rootElement
+        .selectAll(".st_road")
+        .data(lines)
+        .enter()
+        .append("text")
+        .attr("class", "st_road")
+        .attr("font-size", `${FONT_SIZE}px`)
+        .attr("fill", "#fff")
+        .text((d) => d.kn)
+        .attr("id", (d) => `st_road_${d.ls}`)
+        .attr("y", (d) => {
+          const rectY = scaleLinear(+d.lp[1]);
+          return rectY + (TEXT_HEIGHT - FONT_SIZE) / 2 + TEXT_HEIGHT / 2;
+        })
+        .attr("x", (d) => {
+          const rectX = scaleLinear(+d.lp[0]);
+          const textWidth = scaleLinear(d.kn.length * 14);
+          const padding =
+            (textWidth -
+              rootElement
+                .select(`text#st_road_${d.ls}`)
+                .node()
+                .getComputedTextLength()) /
+            2;
+          return rectX + padding;
+        });
+    </script>
+  </body>
+</html>
